@@ -4,7 +4,7 @@ A program to compute the number of word in a file.
 A word is a sequence of letters a-zA-Z, and are all lowercase converted, i.e.
 `BaN` and `ban` are the same word.
 
-See [the specification](MapReduce.pdf).
+See [the original specification](MapReduce.pdf).
 
 Author: Jean-Baptite Yunès, Jean.Baptiste.Yunes@free.fr
 
@@ -25,7 +25,7 @@ The prefix tree for words `a`, `a`, `an`, `at`, `ban`, `the` looks like:
                         |     |
     lvl3                n,1   e,1
 
-## Problem
+#### Problem solved
 To obtain the real count of words, one must ensure that no word is missed.
 The problem is that one cannot simply cut the file into exactly equals chunks, as a naive cut may start a chunk in the moddle of a word.
 Then, before mapping the main thread adjusts begin and ending points of chunks to appropriate positions: position of the beginning of next following word of the theoretical position.
