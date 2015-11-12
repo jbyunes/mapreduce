@@ -24,6 +24,13 @@ The prefix tree for words `a`, `a`, `an`, `at`, `ban`, `the` looks like:
     lvl2   n,1---t,1    a,0   h,0
                         |     |
     lvl3                n,1   e,1
+    
+## Install
+A `Makefile` is provided:
+
+- `all` to generate executable file;
+- `test` to build the executable file and make some tests
+- `clean` to clean the project
 
 #### Problem solved
 To obtain the real count of words, one must ensure that no word is missed.
