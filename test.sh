@@ -38,7 +38,7 @@ do
 done
 rm /tmp/loremtest2
 test_on long `wc -w /tmp/loremtest`
-#rm /tmp/loremtest
+rm /tmp/loremtest
 if [ $ERROR == 0 ]
 then
     echo "Tests ok."
