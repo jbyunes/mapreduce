@@ -6,7 +6,7 @@ A word is a sequence of letters a-zA-Z, and are all lowercase converted, i.e.
 
 See [the original specification](MapReduce.pdf).
 
-Author: Jean-Baptite Yunès, Jean.Baptiste.Yunes@free.fr
+Author: Jean-Baptiste Yunès, Jean.Baptiste.Yunes@free.fr
 
 Date: Nov. 2015
 
