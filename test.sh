@@ -28,12 +28,12 @@ test_on() {
     PASS=`expr $PASS + 1`
     echo
 }
-test_on "very short" `wc -l verysmalltest`
-test_on short `wc -w lorem48`
-test_on standard `wc -w lorem5000`
+test_on "very short" `wc -l data/verysmalltest`
+test_on short `wc -w data/lorem48`
+test_on standard `wc -w data/lorem5000`
 
 # Much huger test
-cp lorem5000 /tmp/loremtest
+cp data/lorem5000 /tmp/loremtest
 for i in 1 2 3 4 5 6
 do
     cat /tmp/loremtest /tmp/loremtest > /tmp/loremtest2
