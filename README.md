@@ -2,7 +2,7 @@
 A program to compute the number of word in a file.
 
 A word is a sequence of letters a-zA-Z, and are all lowercase converted, i.e.
-`BaN` and `ban` are the same word.
+`BaN` and `ban` are the same word. Original spec didn't exactly mention what to do with non alphabetic and non separators chars, we decided to consider every non alphabetic as separator.
 
 See [the original specification](MapReduce.pdf).
 
