@@ -16,7 +16,7 @@
 #include <sys/time.h>
 #endif // TIMED
 
-#define ISALPHA(c) isalpha(c)
+#define IS_ALPHA(c) isalpha(c)
 
 /*
  * A chunk contains:
@@ -38,10 +38,56 @@ struct chunk {
  */
 static void find_next_starting_word(FILE *f) {
   int c;
-  while ( ((c=fgetc(f))!=EOF) && (ISALPHA(c)) ); // jump over alphabetics
+  while ( ((c=fgetc(f))!=EOF) && (IS_ALPHA(c)) ); // jump over alphabetics
   if (c==EOF) return;
-  while ( ((c=fgetc(f)) != EOF) && (!ISALPHA(c)) ); // jump over non alphabetic
+  while ( ((c=fgetc(f)) != EOF) && (!IS_ALPHA(c)) ); // jump over non alphabetic
   if (c!=EOF) ungetc(c,f); // one step ahead, get back
+}
+
+/*
+ * Prepare chunk mapping. Each chunk is adjusted to a word boundary, starting
+ * at the beginning of a word or beginning of file, ending at the beginning
+ * of a word of end of file.
+ *
+ * inputs: chunks, the original chunks; thread_count;
+ *         stat_buf, file properties; chunk_size, naive chunk_size estimated
+ *         from number of thread and filz size; argv0, command name
+ * output; adujsted chunks and thread_count
+ */
+void prepare_chunks(struct chunk *chunks,int *thread_count,struct stat stat_buf,
+                    int chunk_size,char *argv0) {
+  // First chunk starts at 0
+  MYDEBUG("%s: computing chunk #%d\n",argv0,0);
+  chunks[0].start = 0;
+  fseek(chunks[0].file,chunks[0].start+chunk_size,SEEK_SET);
+  find_next_starting_word(chunks[0].file); // find a word boundary
+  chunks[0].len = ftell(chunks[0].file)-chunks[0].start;
+  fseek(chunks[0].file,chunks[0].start,SEEK_SET); // reset to start
+  if (chunks[0].start+chunks[0].len>=stat_buf.st_size) {
+    *thread_count = 1;
+    fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv0,*thread_count);
+    chunks[0].len = stat_buf.st_size-chunks[0].start;
+  }
+  
+  for (int i=1; i<*thread_count; i++) {
+    MYDEBUG("%s: computing chunk #%d\n",argv0,i);
+    chunks[i].start = chunks[i-1].start+chunks[i-1].len;
+    if (chunks[i].start>=stat_buf.st_size) {
+      *thread_count = i;
+      fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv0,*thread_count);
+    }
+    fseek(chunks[i].file,chunks[i].start+chunk_size,SEEK_SET);
+    find_next_starting_word(chunks[i].file); // find a word boundary
+    chunks[i].len = ftell(chunks[i].file)-chunks[i].start;
+    fseek(chunks[i].file,chunks[i].start,SEEK_SET); // reset at start
+    if (chunks[i].start+chunks[i].len>=stat_buf.st_size) {
+      chunks[i].len = stat_buf.st_size-chunks[i].start;
+    }
+  }
+  // In case of "debug" messages, should be optimized at compilation
+  for (int i=0; i<*thread_count; i++) {
+    MYDEBUG("%s: chunk %ld %ld\n",argv[0],chunks[i].start,chunks[i].len);
+  }
 }
 
 /*
@@ -70,7 +116,7 @@ void *task(void *arg) {
   if (chunk->len==0) return chunk;
   while ( (c=fgetc(chunk->file)) != EOF && count<chunk->len ) {
     if (in_word) { // already in the middle of a word
-      if (ISALPHA(c)) { // alphabetic?
+      if (IS_ALPHA(c)) { // alphabetic?
         l = strlen(word);
         word = realloc(word,strlen(word)+2); // one more char
         word[l] = tolower(c);
@@ -84,7 +130,7 @@ void *task(void *arg) {
         *word = '\0';
       }
     } else { // not in a word
-      if (ISALPHA(c)) { // alphabetic?
+      if (IS_ALPHA(c)) { // alphabetic?
         in_word = 1; // in a word now
         word = realloc(word,2); // one more char
         word[0] = tolower(c);
@@ -99,6 +145,7 @@ void *task(void *arg) {
     insert_word(word, &(chunk->root)); // insert the word in the set
   }
   free(word);
+  fclose(chunk->file); // gracefully close file
   return chunk;
 }
 
@@ -136,7 +183,7 @@ int main(int argc,char *argv[]) {
     exit(EXIT_FAILURE);
   }
   if (thread_count<1) {
-    fprintf(stderr,"%s: bad number of threads must be >0\n",argv[0]);
+    fprintf(stderr,"[ERR] %s: bad number of threads must be >0\n",argv[0]);
     exit(EXIT_FAILURE);
   }
   stat(name,&stat_buf);
@@ -153,59 +200,32 @@ int main(int argc,char *argv[]) {
     }
   }
   if (thread_count<1) {
-    fprintf(stderr,"[ERROR] %s: problem opening \"%s\" even once\n",argv[0],name);
+    fprintf(stderr,"[ERR] %s: problem opening \"%s\" even once\n",argv[0],name);
     exit(EXIT_FAILURE);
   }
   threads = calloc(thread_count,sizeof(pthread_t));
   fprintf(stderr,"[LOG] %s: real number of threads is %d\n",argv[0],thread_count);
 
-  // Basic chunk carateristics
+  // Basic chunk charateristics
   MYDEBUG("%s: computing %d chunks\n",argv[0],thread_count);
   chunk_size = stat_buf.st_size/thread_count;
   chunk_size = chunk_size<1?1:chunk_size;
   MYDEBUG("%s: chunk size is %ld\n",argv[0],chunk_size);
 
-  // Adjust chunks caracteristics
-  // Each starts at a word boundary
-  // This may decrease the number of total threads
-  MYDEBUG("%s: computing chunk #%d\n",argv[0],0);
-  chunks[0].start = 0;
-  fseek(chunks[0].file,chunks[0].start+chunk_size,SEEK_SET);
-  find_next_starting_word(chunks[0].file); // find a word boundary
-  chunks[0].len = ftell(chunks[0].file)-chunks[0].start;
-  fseek(chunks[0].file,chunks[0].start,SEEK_SET); // reset at start
-  if (chunks[0].start+chunks[0].len>=stat_buf.st_size) {
-    thread_count = 1;
-    fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv[0],thread_count);
-    chunks[0].len = stat_buf.st_size-chunks[0].start;
-  }
-  for (int i=1; i<thread_count; i++) {
-    MYDEBUG("%s: computing chunk #%d\n",argv[0],i);
-    chunks[i].start = chunks[i-1].start+chunks[i-1].len;
-    if (chunks[i].start>=stat_buf.st_size) {
-      thread_count = i;
-      fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv[0],thread_count);
-    }
-    fseek(chunks[i].file,chunks[i].start+chunk_size,SEEK_SET);
-    find_next_starting_word(chunks[i].file); // find a word boundary
-    chunks[i].len = ftell(chunks[i].file)-chunks[i].start;
-    fseek(chunks[i].file,chunks[i].start,SEEK_SET); // reset at start
-    if (chunks[i].start+chunks[i].len>=stat_buf.st_size) {
-      chunks[i].len = stat_buf.st_size-chunks[i].start;
-    }
-  }
-  
-  for (int i=0; i<thread_count; i++) {
-    MYDEBUG("%s: chunk %ld %ld\n",argv[0],chunks[i].start,chunks[i].len);
-  }
+  // Adjust chunks characteristics
+  prepare_chunks(chunks,&thread_count,stat_buf,chunk_size,argv[0]);
 
-  // MAP: Start the threads
+  // MAP: Start the threads, in case of failure main thread will compute
 #ifdef TIMED
   gettimeofday(&time_start,NULL);
 #endif //TIMED
   fprintf(stderr,"[LOG] %s: starting creating %d thread(s)\n",argv[0],thread_count);
     for (int i=0; i<thread_count; i++) {
-      pthread_create(threads+i,NULL,task,chunks+i);
+      if (pthread_create(threads+i,NULL,task,chunks+i)!=0) {
+        fprintf(stderr,"[LOG] %s: creating thread %d failed, fallback...\n",
+                argv[0],i);
+        task(chunks+i);
+      }
     }
   
   MYDEBUG("%s: waiting results\n",argv[0]);
@@ -221,6 +241,7 @@ int main(int argc,char *argv[]) {
     total_count += status->word_count;
     MYDEBUG("%s: a thread found %d words (%ld %ld)\n",argv[0],status->word_count,status->start,status->len);
     merge_trees(&root,&(status->root));
+    deallocate_tree(&(status->root));
   }
   fprintf(stderr,"[LOG] %s: Found %d words\n",argv[0],total_count);
 
@@ -238,6 +259,7 @@ int main(int argc,char *argv[]) {
 
   // Show results
   print_tree(&root);
+  deallocate_tree(&root);
   
   exit(EXIT_SUCCESS);
 }
