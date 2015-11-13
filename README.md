@@ -30,12 +30,19 @@ A `Makefile` is provided:
 
 - `all` to generate executable file;
 - `test` to build the executable file and make some tests
-- `clean` to clean the project
+- `clean` to clean the project (executable and objects)
+- `status` to obtain the git status (non commited files)
 
-#### Problem solved
+#### Problems solved/adressed
+
+**Word boundary**.
 To obtain the real count of words, one must ensure that no word is missed.
 The problem is that one cannot simply cut the file into exactly equals chunks, as a naive cut may start a chunk in the moddle of a word.
 Then, before mapping the main thread adjusts begin and ending points of chunks to appropriate positions: position of the beginning of next following word of the theoretical position.
+
+**Open files**. As each thread needs its own open file, an upper limit may be enforced by the system, so the number of thread is reduced to the maximum opened file descriptor on the file.
+
+**Thread creation**. Thread creation may fail, in that case, fallback to the main thread is used; all remaining chunks after the failure are handled by the main thread.
 
 ## Tests
 Several tests have been made. Tests included in the build procedure (make all, or make test) use
@@ -60,7 +67,13 @@ With a significantly high number of threads, time decreases down to 7.5, but som
 Code has been naively developped. There is no tricky part. Several improvements may be adressed:
 
 - search in arrays of letters is actually linear, dichotomy may improve performance.
-- words are inserted in trees after having being entirely parsed, incremental insertion certainly improve performance by removing the need for dynamic (re)allocations.
-- thread launching is actually made after the determination of all chunks caracteristics, a more incremental thread launching may be used, but performance will probably not severely improve the overall performance.
+- words are inserted in trees after having being entirely parsed, incremental insertion certainly improve performance by removing the need for dynamic elementary (re)allocations.
+- thread launching is actually made after the determination of all chunks characteristics, a more incremental thread launching may be used, but performance will probably not severely improve the overall performance.
 - MAP is obvious, we may determine an ideal chunk size and cut the file in pieces independently of the number of threads, and then map the chunks to a pool of threads (M-N mapping). This may probably improve performance on very huge files if the choice of size is able to minimize cache defaults...
 - mapping the file in memory may improve performance. Not clear as the file is basically read from left to right and only once.
+
+## TODO
+
+- allocation problems not catched
+- reallocation strategies to be tuned
+- file locking (usually only advisory), private mapping may solve the problem?
