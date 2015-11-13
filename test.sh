@@ -6,12 +6,13 @@ PASS=1
 THREAD_COUNT_LIST="1 2 3 4 5 6 78 100 200 8000"
 
 test_on() {
-    echo "Pass $PASS ($1). \c"
+    FILE=`basename $3`
+    echo "Pass $PASS ($1 on $FILE). #threads: \c"
     for tc in $THREAD_COUNT_LIST
     do
-        echo "$tc  \c"
-        LOG=/tmp/$$.$tc.log
-        RES=/tmp/$$.$tc.res
+        echo "$tc\c"
+        LOG=/tmp/$$.$FILE.$tc.log
+        RES=/tmp/$$.$FILE.$tc.res
         EXEC="$CMD $3 $tc"
         $EXEC > $RES 2> $LOG
         R=`grep Found $LOG | cut -f2 -d\:`
@@ -20,14 +21,16 @@ test_on() {
             ERROR=`expr $ERROR + 1`
             echo "\"$EXEC\" produced an error see $RES and $LOG"
         else
-            rm $LOG $TMP
+            echo "+ \c"
+            rm $LOG $RES
         fi
     done
     PASS=`expr $PASS + 1`
     echo
 }
+test_on "very short" `wc -l verysmalltest`
 test_on short `wc -w lorem48`
-test_on short `wc -w lorem5000`
+test_on standard `wc -w lorem5000`
 
 # Much huger test
 cp lorem5000 /tmp/loremtest
