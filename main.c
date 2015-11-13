@@ -1,6 +1,6 @@
 #define TIMED // time the results
-//#define MYDEBUG(s,...) printf("[DBG]" s,__VA_ARGS__)
-#define MYDEBUG(s,...)
+#define MYDEBUG(s,...) printf("[DBG] %s:" s,cmd_name,__VA_ARGS__)
+//#define MYDEBUG(s,...)
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -18,6 +18,8 @@
 
 #define IS_ALPHA(c) isalpha(c)
 
+static char *cmd_name;
+
 /*
  * A chunk contains:
  * - the portion of the file a single thread should parse
@@ -29,6 +31,7 @@ struct chunk {
   FILE *file;     // the file, thre thread is working on
   int word_count; // the number of words a thread found
   struct node root; // the multi-set of words a thread found
+  int threaded;
 };
 
 /*
@@ -57,7 +60,7 @@ static void find_next_starting_word(FILE *f) {
 void prepare_chunks(struct chunk *chunks,int *thread_count,struct stat stat_buf,
                     int chunk_size,char *argv0) {
   // First chunk starts at 0
-  MYDEBUG("%s: computing chunk #%d\n",argv0,0);
+  MYDEBUG("computing chunk #%d\n",0);
   chunks[0].start = 0;
   fseek(chunks[0].file,chunks[0].start+chunk_size,SEEK_SET);
   find_next_starting_word(chunks[0].file); // find a word boundary
@@ -65,16 +68,16 @@ void prepare_chunks(struct chunk *chunks,int *thread_count,struct stat stat_buf,
   fseek(chunks[0].file,chunks[0].start,SEEK_SET); // reset to start
   if (chunks[0].start+chunks[0].len>=stat_buf.st_size) {
     *thread_count = 1;
-    fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv0,*thread_count);
+    fprintf(stderr,"[LOG] %s: reducing to %d threads\n",cmd_name,*thread_count);
     chunks[0].len = stat_buf.st_size-chunks[0].start;
   }
   
   for (int i=1; i<*thread_count; i++) {
-    MYDEBUG("%s: computing chunk #%d\n",argv0,i);
+    MYDEBUG("computing chunk #%d\n",i);
     chunks[i].start = chunks[i-1].start+chunks[i-1].len;
     if (chunks[i].start>=stat_buf.st_size) {
       *thread_count = i;
-      fprintf(stderr,"[LOG] %s: reducing to %d threads\n",argv0,*thread_count);
+      fprintf(stderr,"[LOG] %s: reducing to %d threads\n",cmd_name,*thread_count);
     }
     fseek(chunks[i].file,chunks[i].start+chunk_size,SEEK_SET);
     find_next_starting_word(chunks[i].file); // find a word boundary
@@ -86,7 +89,7 @@ void prepare_chunks(struct chunk *chunks,int *thread_count,struct stat stat_buf,
   }
   // In case of "debug" messages, should be optimized at compilation
   for (int i=0; i<*thread_count; i++) {
-    MYDEBUG("%s: chunk %ld %ld\n",argv[0],chunks[i].start,chunks[i].len);
+    MYDEBUG("chunk %ld %ld\n",chunks[i].start,chunks[i].len);
   }
 }
 
@@ -158,6 +161,7 @@ void *task(void *arg) {
  * System will gracefully clean everything at termination.
  */
 int main(int argc,char *argv[]) {
+  cmd_name = argv[0]; // for DEBUG
 #ifdef TIMED
   struct timeval time_start, time_end;
 #endif // TIMED
@@ -173,17 +177,17 @@ int main(int argc,char *argv[]) {
 
   // Decode args
   if (argc!=3) {
-    fprintf(stderr,"usage: %s file N\n",argv[0]);
+    fprintf(stderr,"usage: %s file N\n",cmd_name);
     exit(EXIT_FAILURE);
   }
   name = argv[1];
-  MYDEBUG("%s: file is %s\n",argv[0],name);
+  MYDEBUG("file is %s\n",name);
   if (sscanf(argv[2],"%d",&thread_count)!=1) {
-    fprintf(stderr,"usage: %s file N\n",argv[0]);
+    fprintf(stderr,"usage: %s file N\n",cmd_name);
     exit(EXIT_FAILURE);
   }
   if (thread_count<1) {
-    fprintf(stderr,"[ERR] %s: bad number of threads must be >0\n",argv[0]);
+    fprintf(stderr,"[ERR] %s: bad number of threads must be >0\n",cmd_name);
     exit(EXIT_FAILURE);
   }
   stat(name,&stat_buf);
@@ -191,7 +195,7 @@ int main(int argc,char *argv[]) {
 
   // Create chunks
   // First open the file (each thread has its own open file
-  MYDEBUG("%s: determining real number of threads (current %d)\n",argv[0],thread_count);
+  MYDEBUG("determining real number of threads (current %d)\n",thread_count);
   for (int i=0; i<thread_count; i++) {
     chunks[i].file = fopen(name,"r");
     if (chunks[i].file==NULL) {
@@ -200,36 +204,42 @@ int main(int argc,char *argv[]) {
     }
   }
   if (thread_count<1) {
-    fprintf(stderr,"[ERR] %s: problem opening \"%s\" even once\n",argv[0],name);
+    fprintf(stderr,"[ERR] %s: problem opening \"%s\" even once\n",cmd_name,name);
     exit(EXIT_FAILURE);
   }
   threads = calloc(thread_count,sizeof(pthread_t));
-  fprintf(stderr,"[LOG] %s: real number of threads is %d\n",argv[0],thread_count);
+  fprintf(stderr,"[LOG] %s: real number of threads is %d\n",cmd_name,thread_count);
 
   // Basic chunk charateristics
-  MYDEBUG("%s: computing %d chunks\n",argv[0],thread_count);
+  MYDEBUG("computing %d chunks\n",thread_count);
   chunk_size = stat_buf.st_size/thread_count;
   chunk_size = chunk_size<1?1:chunk_size;
-  MYDEBUG("%s: chunk size is %ld\n",argv[0],chunk_size);
+  MYDEBUG("chunk size is %ld\n",chunk_size);
 
   // Adjust chunks characteristics
-  prepare_chunks(chunks,&thread_count,stat_buf,chunk_size,argv[0]);
+  prepare_chunks(chunks,&thread_count,stat_buf,chunk_size,cmd_name);
 
   // MAP: Start the threads, in case of failure main thread will compute
 #ifdef TIMED
   gettimeofday(&time_start,NULL);
 #endif //TIMED
-  fprintf(stderr,"[LOG] %s: starting creating %d thread(s)\n",argv[0],thread_count);
-    for (int i=0; i<thread_count; i++) {
-      if (pthread_create(threads+i,NULL,task,chunks+i)!=0) {
-        fprintf(stderr,"[LOG] %s: creating thread %d failed, fallback...\n",
-                argv[0],i);
-        task(chunks+i);
-      }
+  fprintf(stderr,"[LOG] %s: starting creating %d thread(s)\n",cmd_name,thread_count);
+  for (int i=0; i<thread_count; i++) {
+    if ((chunks[i].threaded=pthread_create(threads+i,NULL,task,chunks+i))!=0) {
+      fprintf(stderr,"[LOG] %s: creating thread %d failed, fallback...\n",
+              cmd_name,i);
     }
+  }
+  // fallback, main thread will do the job
+  for (int i=0; i<thread_count; i++) {
+    if (chunks[i].threaded!=0) {
+      fprintf(stderr,"[LOG] %s: falling back %d\n",cmd_name,i);
+      task(chunks+i);
+    }
+  }
   
-  MYDEBUG("%s: waiting results\n",argv[0]);
-
+  MYDEBUG("waiting %d results\n",thread_count);
+  
   // Init result
   root.len = 0;
   root.letters = NULL;
@@ -237,13 +247,14 @@ int main(int argc,char *argv[]) {
 
   //REDUCE: Accumulate results
   for (int i=0; i<thread_count; i++) {
-    pthread_join(threads[i],(void **)&status);
+    if (chunks[i].threaded==0) pthread_join(threads[i],(void **)&status);
+    else status = chunks+i; // in case of fallback
     total_count += status->word_count;
-    MYDEBUG("%s: a thread found %d words (%ld %ld)\n",argv[0],status->word_count,status->start,status->len);
+    MYDEBUG("a thread found %d words (%ld %ld)\n",status->word_count,status->start,status->len);
     merge_trees(&root,&(status->root));
     deallocate_tree(&(status->root));
   }
-  fprintf(stderr,"[LOG] %s: Found %d words\n",argv[0],total_count);
+  fprintf(stderr,"[LOG] %s: Found %d words\n",cmd_name,total_count);
 
 #ifdef TIMED
   gettimeofday(&time_end,NULL);
@@ -252,7 +263,7 @@ int main(int argc,char *argv[]) {
     time_end.tv_sec--;
   }
   fprintf(stderr,"[LOG] %s: ELAPSED %4ld,%06d\n",
-          argv[0],
+          cmd_name,
           time_end.tv_sec-time_start.tv_sec,
           time_end.tv_usec-time_start.tv_usec);
 #endif // TIMED

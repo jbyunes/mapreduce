@@ -45,12 +45,17 @@ Then, before mapping the main thread adjusts begin and ending points of chunks t
 **Thread creation**. Thread creation may fail, in that case, fallback to the main thread is used; all remaining chunks after the failure are handled by the main thread.
 
 ## Tests
-Several tests have been made. Tests included in the build procedure (make all, or make test) use
-    Lorem Ipsum generated files with different number of threads.
-    Tests have been made with different type of files: source code, binaries.
-    As it is difficult to verify the accuracy, these have not been included,
-    but results at least seems correct.
-    Tests have been made on
+Several tests have been made.
+
+Some Test are included in the build procedure (make all, or make test) use *Lorem Ipsum* generated files with different number of threads.
+
+Thread creation failure tested in various situations.
+
+Tests have been made with different type of files: source code, binaries.
+As it is difficult to verify the accuracy, these have not been included,
+but results at least seems correct.
+
+Tests have been made on:
 
 - MacOSX 10.11.1 El Capitan, Apple LLVM version 7.0.0 (clang-700.1.76), POSIX Threads, X86_64, two cores with four threads each
 - Linux 4.2.5 Fedora 22 TwentyTwo, gcc 5.1.1, POSIX Threads, X86_64
