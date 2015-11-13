@@ -36,3 +36,4 @@ struct alpha_node *insert_letter(int c,struct node *node);
 void merge_trees(struct node *in,struct node *from);
 void print_tree(struct node *root);
 void insert_word(char *word,struct node *root);
+void deallocate_tree(struct node *root);

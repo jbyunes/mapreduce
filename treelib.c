@@ -137,3 +137,15 @@ void insert_word(char *word,struct node *root) {
   }
 }
 
+/*
+ * Tree deallocation
+ */
+void deallocate_tree(struct node *root) {
+  if (root==NULL) return;
+  for (int i=0; i<root->len; i++) {
+    deallocate_tree(root->letters[i].one_letter_more);
+    free(root->letters[i].one_letter_more);
+  }
+  free(root->letters);
+}
+
