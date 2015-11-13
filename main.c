@@ -113,6 +113,11 @@ void *task(void *arg) {
   int in_word = 1;
   int c;
   char *word = malloc(1);
+  if (word==NULL) {
+    fprintf(stderr,"[ERR] alloc problem\n");
+    exit(1);
+  }
+
   int l;
   *word = '\0';
   chunk->word_count = 0;
@@ -122,6 +127,10 @@ void *task(void *arg) {
       if (IS_ALPHA(c)) { // alphabetic?
         l = strlen(word);
         word = realloc(word,strlen(word)+2); // one more char
+        if (word==NULL) {
+          fprintf(stderr,"[ERR] alloc problem\n");
+          exit(1);
+        }
         word[l] = tolower(c);
         word[l+1] = '\0';
       } else { // non alphabetic, so end of a word
@@ -130,12 +139,20 @@ void *task(void *arg) {
         insert_word(word, &(chunk->root)); // insert the word in the set
         free(word);
         word = malloc(1); // new empty word
+        if (word==NULL) {
+          fprintf(stderr,"[ERR] alloc problem\n");
+          exit(1);
+        }
         *word = '\0';
       }
     } else { // not in a word
       if (IS_ALPHA(c)) { // alphabetic?
         in_word = 1; // in a word now
         word = realloc(word,2); // one more char
+        if (word==NULL) {
+          fprintf(stderr,"[ERR] alloc problem\n");
+          exit(1);
+        }
         word[0] = tolower(c);
         word[1] = '\0';
       } else { // nothing to do here, not in w word and not an alphabetic...
@@ -192,6 +209,10 @@ int main(int argc,char *argv[]) {
   }
   stat(name,&stat_buf);
   chunks = calloc(thread_count,sizeof(struct chunk));
+  if (chunks==NULL) {
+    fprintf(stderr,"[ERR] alloc problem\n");
+    exit(1);
+  }
 
   // Create chunks
   // First open the file (each thread has its own open file
@@ -208,6 +229,11 @@ int main(int argc,char *argv[]) {
     exit(EXIT_FAILURE);
   }
   threads = calloc(thread_count,sizeof(pthread_t));
+  if (threads==NULL) {
+    fprintf(stderr,"[ERR] alloc problem\n");
+    exit(1);
+  }
+
   fprintf(stderr,"[LOG] %s: real number of threads is %d\n",cmd_name,thread_count);
 
   // Basic chunk charateristics

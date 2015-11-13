@@ -36,6 +36,10 @@ static inline void init_alpha_node(int c,struct alpha_node *n) {
   n->c = c;
   n->count = 0;
   n->one_letter_more = malloc(sizeof(struct node));
+  if (n->one_letter_more==NULL) {
+    fprintf(stderr,"[ERR] alloc problem\n");
+    exit(1);
+  }
   n->one_letter_more->len = 0;
   n->one_letter_more->letters = NULL;
 }
@@ -51,6 +55,11 @@ struct alpha_node *insert_letter(int c,struct node *node) {
   int i;
   
   node->letters = realloc(node->letters,(node->len+1)*sizeof(struct alpha_node));
+  if (node->letters==NULL) {
+      fprintf(stderr,"[ERR] alloc problem\n");
+    exit(1);
+  }
+
   if (node->len>0) { // there was previously something
     for (i=0; i<node->len && c>node->letters[i].c; i++); // find its place
     if (i<node->len) {
@@ -94,6 +103,10 @@ static void _print_tree(char *prefix,struct node *root) {
   if (root->len>0) {
     int l = strlen(prefix);  
     char *new_prefix = malloc(l+2); // create a new temporary prefix of length+1
+    if (new_prefix==NULL) {
+      fprintf(stderr,"[ERR] alloc problem\n");
+      exit(1);
+    }
     strcpy(new_prefix,prefix);
     new_prefix[l+1] = '\0';
     for (int i=0; i<root->len; i++) { // parse all letters
