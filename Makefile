@@ -9,7 +9,7 @@ endif
 OBJS = main.o treelib.o
 EXEC = mapred
 
-.PHONY=all test
+.PHONY=all test status
 
 $(EXEC): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -27,3 +27,6 @@ clean:
 	rm $(OBJS) $(EXEC)
 
 all: $(EXEC) test
+
+status:
+	git status
